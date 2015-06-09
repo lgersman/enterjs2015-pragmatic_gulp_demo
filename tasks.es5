@@ -1,0 +1,51 @@
+'use strict';
+
+var gulp = require('gulp'),
+    es = require('event-stream'),
+    shell = require('gulp-shell'),
+    through2 = require('through2'),
+    babel = require('babel'),
+    fs = require('fs')
+;
+
+var PACKAGE = JSON.parse(fs.readFileSync('./package.json')),
+    DIST = 'dist',
+    HEADER = '/**\n* Package         : ' 
+    + PACKAGE.name 
+    + '\n* Version         : ' 
+    + PACKAGE.version 
+    + '\n* GIT Repository  : ' 
+    + PACKAGE.repository.url 
+    + '\n*\n* Description     :\n* ' 
+    + PACKAGE.description.replace(/\n/g, '\n *') 
+    + '\n*\n* Copyright ' 
+    + PACKAGE.author + '\n*/\n\n'
+;
+
+gulp.task('clean', shell.task('rm -rf ' + DIST));
+
+gulp.task('prepare', ['clean'], function (done) {
+  return shell.task('mkdir ' + DIST)().on('end', function () {
+    return fs.writeFileSync('' + DIST + '/index.js', '' + babel.buildExternalHelpers() + ' \n\nexports.b = require(\'./b\');');
+  });
+});
+
+// compare with similar gulp https://babeljs.io/docs/using-babel/#gulp
+gulp.task('compile', ['prepare'], shell.task('./node_modules/.bin/babel src -s -r --out-dir ' + DIST));
+
+gulp.task('build', ['compile', 'test:node'], function (done) {
+  return (
+    // append header to all javascript files
+    gulp.src(['' + DIST + '/**/*.es6', '' + DIST + '/**/*.js']).pipe(through2.obj(function (file, enc, done) {
+      return (file.contents = new Buffer(HEADER + file.contents)) && done(null, file);
+    })).pipe(gulp.dest(DIST))
+  );
+});
+
+gulp.task('test', ['build']);
+
+gulp.task('test:node', function () {
+  return es.merge(shell.task('node_modules/.bin/eslint src/*.es6 test/*es6')(), shell.task('node test/test-node-specs.js')());
+});
+
+gulp.task('default', ['test']);
