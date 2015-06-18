@@ -6,6 +6,8 @@ const gulp        = require('gulp'),
       fs          = require('fs')
 ;
 
+pfy.verbose=true;
+
 const PACKAGE = JSON.parse(fs.readFileSync('./package.json')),
       DIST    = 'dist',
       HEADER  = `/**
@@ -47,6 +49,9 @@ gulp.task('test', ['build']);
 gulp.task('test:node', ()=>Promise.all([
   pfy('node_modules/.bin/eslint src/*.es6 test/*es6')(),
   pfy('node test/test-node-specs.js')()
+  .then(stdout=>
+    (stdout.indexOf('0 failures')===-1) && process.exit(-1)
+  )
 ]));
 
 gulp.task('default', ['test']);
